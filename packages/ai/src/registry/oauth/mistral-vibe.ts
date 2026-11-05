@@ -18,7 +18,7 @@ import { type OAuthDeviceCodePollResult, pollOAuthDeviceCodeFlow } from "./devic
 import { generatePKCE } from "./pkce";
 import type { OAuthController } from "./types";
 
-const PROVIDER = "mistral";
+const PROVIDER = "mistral-vibe";
 const CONSOLE_ORIGIN = "https://console.mistral.ai";
 const API_PATH = "/api";
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -29,7 +29,7 @@ const MAX_CONSECUTIVE_POLL_FAILURES = 3;
 const MAX_RETRY_AFTER_MS = 30_000;
 /** Console `error_code` when the selected workspace may not mint API keys. */
 const WORKSPACE_DENIED_ERROR_CODE = 9004;
-const EXPIRED_MESSAGE = "Mistral sign-in expired; run /login again";
+const EXPIRED_MESSAGE = "Mistral sign-in expired; run /login mistral-vibe again";
 
 const startSchema = type({
 	process_id: "string > 0",
@@ -179,7 +179,7 @@ async function exchangeForApiKey(
 	);
 	if (response.status === 403 && isRecord(payload) && payload.error_code === WORKSPACE_DENIED_ERROR_CODE) {
 		throw oauthError(
-			"Your Mistral workspace can't be used for Mistral Vibe; run /login again and pick another workspace in the browser, or ask your administrator",
+			"Your Mistral workspace can't be used for Mistral Vibe; run /login mistral-vibe again and pick another workspace in the browser, or ask your administrator",
 			"entitlement",
 			403,
 		);

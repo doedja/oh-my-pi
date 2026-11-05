@@ -1,7 +1,11 @@
-// Browser sign-in mirrors the Mistral Vibe CLI and mints a regular API key billed
-// against the plan's Vibe Code quota; the hook returns it as a plain API key.
+// Pay-as-you-go console keys. Subscription sign-in lives on "mistral-vibe".
 auth "mistral" {
 	name "Mistral"
 	env "MISTRAL_API_KEY"
-	login "custom" hook="mistral-vibe-sign-in"
+	login "api-key" {
+		auth-url "https://console.mistral.ai/api-keys"
+		instructions "Create or copy your key from the Mistral console"
+		prompt "Paste your Mistral API key" placeholder="API key"
+		validate "models-endpoint" label="Mistral" url="https://api.mistral.ai/v1/models"
+	}
 }

@@ -13,7 +13,7 @@ const POLL_URL = "https://console.mistral.ai/api/vibe/sign-in/proc-1";
 const EXCHANGE_URL = "https://console.mistral.ai/api/vibe/sign-in/proc-1/exchange";
 const BROWSER_URL = "https://console.mistral.ai/codestral/cli/authenticate?process_id=proc-1";
 
-const loginMistral = getProviderDefinition("mistral")?.login;
+const loginMistral = getProviderDefinition("mistral-vibe")?.login;
 if (!loginMistral) throw new Error("Mistral login is not registered");
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -200,7 +200,7 @@ describe("mistral vibe sign-in persistence", () => {
 		store = await SqliteAuthCredentialStore.open(path.join(tempDir, "agent.db"));
 		const mistral = mockConsole({ polls: [completed()] });
 
-		const outcome = await new AuthStorage(store).oauth.login("mistral", {
+		const outcome = await new AuthStorage(store).oauth.login("mistral-vibe", {
 			onAuth: () => {},
 			onPrompt: async () => {
 				throw new Error("browser sign-in must not prompt");
@@ -209,7 +209,7 @@ describe("mistral vibe sign-in persistence", () => {
 		});
 
 		expect(outcome).toEqual({ type: "api_key" });
-		expect(store.listAuthCredentials("mistral").map(row => row.credential)).toEqual([
+		expect(store.listAuthCredentials("mistral-vibe").map(row => row.credential)).toEqual([
 			expect.objectContaining({ type: "api_key", key: "vibe-key" }),
 		]);
 	});
