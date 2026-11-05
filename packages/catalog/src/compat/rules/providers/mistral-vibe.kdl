@@ -1,0 +1,48 @@
+// Mistral Vibe subscription keys (`/login mistral-vibe`) call the same
+// chat-completions API as "mistral", but bill the plan's monthly Vibe Code
+// allowance. The live roster comes from GET /v1/model-catalog?surface=vibe-code
+// (mistralai/mistral-vibe vibe/core/model_catalog/) and adds to these rows.
+
+provider "mistral-vibe" {
+	default-model "mistral-vibe-cli-latest"
+	env "MISTRAL_VIBE_API_KEY"
+
+	// The CLI's built-in models (vibe/core/config/vibe_schema.py,
+	// vibe/core/llm/utility_completion.py, mistral-vibe 3.1.0): these ids are
+	// the names the Mistral API meters for Vibe. Costs are the CLI's own
+	// API-equivalent prices, for stats only; requests bill the allowance.
+	// mistral-vibe-cli-latest is Mistral Medium 3.5 and takes reasoning
+	// "high" or "none" (harness completion_profile/known_models.py).
+	seed api="openai-completions" base-url="https://api.mistral.ai/v1" bundle="always" {
+		model "mistral-vibe-cli-latest" name="Mistral Medium 3.5 (Vibe)" {
+			reasoning #true
+			input "text" "image"
+			cost input=1.5 output=7.5 cache-read=0.15 cache-write=0
+			limits context=262144 max-tokens=262144
+			thinking-mode "effort"
+			thinking-efforts "high"
+		}
+		// The CLI's utility model (alias mistral-small), run without reasoning;
+		// it shares mistral-small-latest's limits.
+		model "mistral-vibe-cli-fast" name="Mistral Small (Vibe)" {
+			reasoning #false
+			input "text"
+			cost input=0.1 output=0.3 cache-read=0 cache-write=0
+			limits context=262144 max-tokens=256000
+		}
+	}
+
+	// Same wire contract as "mistral" (providers/mistral.kdl).
+	supports-prompt-cache-key #true
+	requires-reasoning-content-for-tool-calls #false
+	requires-reasoning-content-for-all-assistant-turns #false
+	mistral-reasoning-content-parts #true
+
+	// residue: the CLI alias classifies as a generic Mistral id, but Medium 3.5
+	// accepts only reasoning_effort "high" (or "none" for off). Catalog rows
+	// carry their own ladder from `parameters.reasoning`.
+	models "mistral-vibe-cli-latest" {
+		thinking-mode "effort"
+		thinking-efforts "high"
+	}
+}

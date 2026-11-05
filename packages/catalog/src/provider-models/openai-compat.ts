@@ -3216,6 +3216,8 @@ export function waferServerlessModelManagerOptions(
 // 7. Mistral
 // ---------------------------------------------------------------------------
 
+const MISTRAL_API_BASE_URL = "https://api.mistral.ai/v1";
+
 export interface MistralModelManagerConfig {
 	apiKey?: string;
 	baseUrl?: string;
@@ -3225,7 +3227,139 @@ export interface MistralModelManagerConfig {
 export function mistralModelManagerOptions(
 	config?: MistralModelManagerConfig,
 ): ModelManagerOptions<"openai-completions"> {
-	return createSimpleOpenAICompletionsOptions("mistral", "https://api.mistral.ai/v1", config);
+	return createSimpleOpenAICompletionsOptions("mistral", MISTRAL_API_BASE_URL, config);
+}
+
+/** The Vibe CLI's roster surface (mistralai/mistral-vibe vibe/core/model_catalog/_constants.py). */
+const MISTRAL_VIBE_MODEL_CATALOG_PATH = "/model-catalog?surface=vibe-code";
+/** `parameters.reasoning` lists `reasoning_effort` wire values; this one is the off level. */
+const MISTRAL_VIBE_REASONING_OFF = "none";
+const THINKING_EFFORT_SET: ReadonlySet<string> = new Set(THINKING_EFFORTS);
+
+function isThinkingEffort(value: unknown): value is Effort {
+	return typeof value === "string" && THINKING_EFFORT_SET.has(value);
+}
+
+type MistralVibeReferenceResolver = (
+	id: string,
+	aliases: readonly string[],
+) => ModelSpec<"openai-completions"> | undefined;
+
+interface MistralVibeCatalogContext {
+	baseUrl: string;
+	/** Ids bundled for mistral-vibe; a catalog entry naming one as an alias folds onto it. */
+	bundledIds: ReadonlySet<string>;
+	resolveReference: MistralVibeReferenceResolver;
+}
+
+/**
+ * One `/model-catalog` entry as a Vibe model. Like the CLI, an entry needs an
+ * `id` and `label` and is dropped without `capabilities.function_calling`.
+ * The entry owns the name, image input, context window and, when it lists
+ * `parameters.reasoning`, the effort ladder; cost and output cap come from
+ * the bundled row for the id or one of its aliases (`mistral-medium-3.5` is
+ * served as `mistral-medium-latest`). An entry whose aliases name a bundled
+ * Vibe id (`mistral-medium-latest` lists `mistral-vibe-cli-latest`) is listed
+ * under that id, so one model shows once and the default keeps its id.
+ */
+function mapMistralVibeCatalogEntry(
+	entry: unknown,
+	{ baseUrl, bundledIds, resolveReference }: MistralVibeCatalogContext,
+): ModelSpec<"openai-completions"> | null {
+	if (!isRecord(entry) || !isRecord(entry.capabilities) || entry.capabilities.function_calling !== true) return null;
+	const id = typeof entry.id === "string" ? entry.id.trim() : "";
+	const label = typeof entry.label === "string" ? entry.label.trim() : "";
+	if (!id || !label) return null;
+	const aliases = Array.isArray(entry.aliases)
+		? entry.aliases.filter((alias): alias is string => typeof alias === "string" && alias.trim().length > 0)
+		: [];
+	const publicId = bundledIds.has(id) ? id : (aliases.find(alias => bundledIds.has(alias)) ?? id);
+	let chatReference: Partial<ModelSpec<"openai-completions">> = {};
+	const reference = resolveReference(publicId, [id, ...aliases]);
+	if (reference) {
+		// Neither a runner kind nor another host's effort ladder carries over.
+		const { kind: _inheritedKind, thinking: _inheritedThinking, ...rest } = reference;
+		chatReference = rest;
+	}
+	const base: ModelSpec<"openai-completions"> = {
+		reasoning: false,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: null,
+		maxTokens: null,
+		...chatReference,
+		id: publicId,
+		name: label,
+		api: "openai-completions",
+		provider: "mistral-vibe",
+		baseUrl,
+	};
+	const parameters = isRecord(entry.parameters) ? entry.parameters : undefined;
+	const reasoningValues = Array.isArray(parameters?.reasoning) ? parameters.reasoning : undefined;
+	// An unlisted ladder ("the client decides") keeps the reference's reasoning
+	// flag and leaves the ladder to the provider rules.
+	const efforts = reasoningValues?.filter(
+		(value): value is Effort => value !== MISTRAL_VIBE_REASONING_OFF && isThinkingEffort(value),
+	);
+	return {
+		...base,
+		input: entry.capabilities.vision === true ? ["text", "image"] : ["text"],
+		contextWindow: toPositiveNumber(entry.max_context_length, base.contextWindow),
+		...(efforts && {
+			reasoning: efforts.length > 0,
+			thinking: efforts.length > 0 ? { mode: "effort" as const, efforts } : undefined,
+		}),
+	};
+}
+
+export interface MistralVibeModelManagerConfig {
+	apiKey?: string;
+	baseUrl?: string;
+	fetch?: FetchImpl;
+}
+
+/**
+ * Mistral Vibe subscription keys. Discovery reads the CLI's model catalog,
+ * not `/v1/models`: a Vibe key lists every model of its workspace there,
+ * including ones outside the plan. The catalog adds to the bundled CLI
+ * models instead of replacing them, so a catalog that renames or omits
+ * `mistral-vibe-cli-latest` never removes the default.
+ */
+export function mistralVibeModelManagerOptions(
+	config?: MistralVibeModelManagerConfig,
+): ModelManagerOptions<"openai-completions"> {
+	const apiKey = config?.apiKey;
+	const baseUrl = (config?.baseUrl ?? MISTRAL_API_BASE_URL).replace(/\/+$/, "");
+	const fetchImpl = discoveryFetch(config?.fetch);
+	const vibeReferences = createBundledReferenceMap<"openai-completions">("mistral-vibe");
+	const mistralReferences = createBundledReferenceMap<"openai-completions">("mistral");
+	const resolveReference: MistralVibeReferenceResolver = (id, aliases) => {
+		for (const references of [vibeReferences, mistralReferences]) {
+			for (const candidate of [id, ...aliases]) {
+				const reference = references.get(candidate);
+				if (reference) return reference;
+			}
+		}
+		return undefined;
+	};
+	const catalog: MistralVibeCatalogContext = { baseUrl, bundledIds: new Set(vibeReferences.keys()), resolveReference };
+	return {
+		providerId: "mistral-vibe",
+		...(apiKey && {
+			fetchDynamicModels: async () => {
+				const response = await withOpenAICompatibleDiscoveryTimeout(5_000, signal =>
+					fetchImpl(`${baseUrl}${MISTRAL_VIBE_MODEL_CATALOG_PATH}`, {
+						signal,
+						headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+					}),
+				);
+				if (!response.ok) return null;
+				const payload: unknown = await response.json();
+				if (!isRecord(payload) || !Array.isArray(payload.models)) return null;
+				return payload.models.flatMap(entry => mapMistralVibeCatalogEntry(entry, catalog) ?? []);
+			},
+		}),
+	};
 }
 
 // ---------------------------------------------------------------------------

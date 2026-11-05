@@ -14,6 +14,7 @@ import { antigravityRankingStrategy, antigravityUsageProvider } from "./google-a
 import { kimiRankingStrategy, kimiUsageProvider } from "./kimi";
 import { museCodeUsageProvider } from "./muse-code";
 import { minimaxCodeUsageProvider } from "./minimax-code";
+import { mistralVibeRankingStrategy, mistralVibeUsageProvider } from "./mistral-vibe";
 import { ollamaCloudUsageProvider, ollamaUsageProvider } from "./ollama";
 import { codexRankingStrategy, openaiCodexUsageProvider } from "./openai-codex";
 import { opencodeGoRankingStrategy, opencodeGoUsageProvider } from "./opencode-go";
@@ -32,6 +33,7 @@ export const DEFAULT_USAGE_PROVIDERS: readonly UsageProvider[] = [
 	kimiUsageProvider,
 	minimaxCodeUsageProvider,
 	museCodeUsageProvider,
+	mistralVibeUsageProvider,
 	antigravityUsageProvider,
 	googleGeminiCliUsageProvider,
 	ollamaUsageProvider,
@@ -72,6 +74,7 @@ const DEFAULT_RANKING_STRATEGIES = new Map<Provider, CredentialRankingStrategy>(
 	["opencode-go", opencodeGoRankingStrategy],
 	["xai-oauth", xaiOauthRankingStrategy],
 	["commandcode", commandCodeRankingStrategy],
+	["mistral-vibe", mistralVibeRankingStrategy],
 ]);
 
 /** Built-in ranking strategy for `provider`. */

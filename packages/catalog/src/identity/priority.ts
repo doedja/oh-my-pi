@@ -14,6 +14,7 @@ const DEFAULT_MODEL_PROVIDER_ORDER = [
 	"zai",
 	"xai-oauth",
 	"xai",
+	"mistral-vibe",
 	"mistral",
 	"deepseek",
 	"groq",

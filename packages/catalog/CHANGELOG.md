@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added the `mistral-vibe` provider for Mistral Vibe subscriptions, defaulting to the Vibe CLI's `mistral-vibe-cli-latest` (Mistral Medium 3.5) and adding the rest of the plan's models from the Vibe model catalog
 - Added the `tool-name-prefix` compat axis for Responses hosts that reject requests declaring certain exact tool names; Muse Code sets it to `_` ([#17435](https://github.com/can1357/oh-my-pi/issues/17435), [#17515](https://github.com/can1357/oh-my-pi/pull/17515) by [@harshav167](https://github.com/harshav167), continued in [#18053](https://github.com/can1357/oh-my-pi/pull/18053) by [@abilliontokens](https://github.com/abilliontokens))
 - Added the `supports-message-threads` compat axis (`supportsMessageThreads`), enabled for Claude 4.5 and newer on the first-party Anthropic provider
 - Added a standard Responses WebSocket capability rule for explicit opt-in through OMP settings or SDK preferences, disabled by default ([#17354](https://github.com/can1357/oh-my-pi/pull/17354) by [@TatsukiMeng](https://github.com/TatsukiMeng))
@@ -17,6 +18,7 @@
 
 ### Changed
 
+- `/login mistral` now prompts for a console API key; the Mistral Vibe browser sign-in is `/login mistral-vibe`
 - Factory Droid reports client version 1.1.0, and Claude requests routed to Azure Foundry stream tool input eagerly like the Anthropic and Vertex routes ([#17885](https://github.com/can1357/oh-my-pi/pull/17885) by [@will-bogusz](https://github.com/will-bogusz))
 
 ## [18.16.0] - 2026-11-02
